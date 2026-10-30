@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # DBTITLE 1,00 - Download Configuration
 from pathlib import Path
 from datetime import datetime, timezone
@@ -17,6 +21,7 @@ REQUIRED_GTFS_FILES = {
 VOLUME.mkdir(parents=True, exist_ok=True)
 
 # COMMAND ----------
+
 # DBTITLE 1,01 - Define Safe Download and Deduplication
 def fetch_gtfs_snapshot():
     hasher = hashlib.sha256()
@@ -92,16 +97,26 @@ def fetch_gtfs_snapshot():
             print(f"Saved: {metadata_target}")
         else:
             print("Skipped snapshot creation; existing snapshots unchanged.")
+        return feed_changed
     finally:
         if os.path.exists(local_tmp):
             os.remove(local_tmp)
 
 
 # COMMAND ----------
+
 # DBTITLE 1,02 - Fetch, Validate, and Store New Feed
-fetch_gtfs_snapshot()
+feed_changed = fetch_gtfs_snapshot()
+
+dbutils.jobs.taskValues.set(
+    key="feed_changed",
+    value=str(feed_changed).lower()
+)
+
+print(f"Job task value: feed_changed = {str(feed_changed).lower()}")
 
 # COMMAND ----------
+
 # DBTITLE 1,03 - Inspect Available Snapshots
 for path in sorted(VOLUME.glob("budapest_gtfs_*.zip")):
     print(f"{path.name}: {path.stat().st_size:,} bytes")
