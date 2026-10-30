@@ -1,8 +1,58 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
+# DBTITLE 1,00 - Configure Silver Snapshot and Output
+from pyspark.sql import functions as F
+import re
+
+# Main Silver tables: snapshot-scoped Delta writes.
+CATALOG_SCHEMA = "workspace.default"
+SOURCE_PREFIX = "bronze_"
+TARGET_PREFIX = "silver_"
+
+SNAPSHOT_ID = (
+    spark.table(f"{CATALOG_SCHEMA}.bronze_trips")
+    .agg(F.max("snapshot_id").alias("id"))
+    .first()["id"]
+)
+if not SNAPSHOT_ID:
+    raise ValueError("Bronze contains no snapshot IDs")
+if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", SNAPSHOT_ID):
+    raise ValueError(f"Unexpected snapshot ID format: {SNAPSHOT_ID}")
+
+print(f"Processing Silver snapshot: {SNAPSHOT_ID}")
+print(f"Output prefix: {CATALOG_SCHEMA}.{TARGET_PREFIX}")
+
+def bronze(dataset):
+    df = spark.table(f"{CATALOG_SCHEMA}.{SOURCE_PREFIX}{dataset}")
+    selected = df.filter(F.col("snapshot_id") == SNAPSHOT_ID)
+    if selected.limit(1).count() == 0:
+        raise ValueError(f"Missing Bronze {dataset} for snapshot {SNAPSHOT_ID}")
+    return selected
+
+def target(dataset):
+    return f"{CATALOG_SCHEMA}.{TARGET_PREFIX}{dataset}"
+
+def save_snapshot(df, dataset):
+    # Check before writing so a failed transformation cannot erase existing rows.
+    if df.limit(1).count() == 0:
+        raise ValueError(f"Refusing to write empty Silver {dataset} for {SNAPSHOT_ID}")
+    (
+        df.write.format("delta")
+        .mode("overwrite")
+        .option("replaceWhere", f"snapshot_id = '{SNAPSHOT_ID}'")
+        .saveAsTable(target(dataset))
+    )
+    print(f"Saved {dataset}: {df.count():,} rows, snapshot={SNAPSHOT_ID}")
+
+# COMMAND ----------
+
 # DBTITLE 1,silver_routes
 from pyspark.sql import functions as F
 
-bronze_routes = spark.table("workspace.default.bronze_routes")
+bronze_routes = bronze("routes")
 
 silver_routes = (
     bronze_routes
@@ -23,23 +73,18 @@ silver_routes = (
     .dropDuplicates(["route_id", "snapshot_id"])
 )
 
-(
-    silver_routes.write
-    .format("delta")
-    .mode("overwrite")
-    .saveAsTable("workspace.default.silver_routes")
-)
+save_snapshot(silver_routes, "routes")
 
 print(f"Silver routes loaded: {silver_routes.count()} rows")
 
-display(spark.table("workspace.default.silver_routes").limit(5))
+display(spark.table(target("routes")).limit(5))
 
 # COMMAND ----------
 
 # DBTITLE 1,02 - Silver Stops Transformation
 from pyspark.sql import functions as F
 
-bronze_stops = spark.table("workspace.default.bronze_stops")
+bronze_stops = bronze("stops")
 
 silver_stops = (
     bronze_stops
@@ -64,24 +109,19 @@ silver_stops = (
     .dropDuplicates(["stop_id", "snapshot_id"])
 )
 
-(
-    silver_stops.write
-    .format("delta")
-    .mode("overwrite")
-    .saveAsTable("workspace.default.silver_stops")
-)
+save_snapshot(silver_stops, "stops")
 
 print(f"Bronze stops: {bronze_stops.count()}")
 print(f"Silver stops: {silver_stops.count()}")
 
-display(spark.table("workspace.default.silver_stops").limit(5))
+display(spark.table(target("stops")).limit(5))
 
 # COMMAND ----------
 
 # DBTITLE 1,03 - Silver Trips Transformation
 from pyspark.sql import functions as F
 
-bronze_trips = spark.table("workspace.default.bronze_trips")
+bronze_trips = bronze("trips")
 
 silver_trips = (
     bronze_trips
@@ -108,26 +148,39 @@ silver_trips = (
     .dropDuplicates(["trip_id", "snapshot_id"])
 )
 
-(
-    silver_trips.write
-    .format("delta")
-    .mode("overwrite")
-    .saveAsTable("workspace.default.silver_trips")
-)
+save_snapshot(silver_trips, "trips")
 
 print(f"Bronze trips: {bronze_trips.count()}")
 print(f"Silver trips: {silver_trips.count()}")
 
-display(spark.table("workspace.default.silver_trips").limit(5))
+display(spark.table(target("trips")).limit(5))
 
 # COMMAND ----------
 
 # DBTITLE 1,04 - Silver Stop Times Transformation
 from pyspark.sql import functions as F
 
-bronze_stop_times = spark.table(
-    "workspace.default.bronze_stop_times"
-)
+bronze_stop_times = bronze("stop_times")
+# Validate non-empty GTFS time values before transformation
+for time_column in ["arrival_time", "departure_time"]:
+    raw_time = F.trim(F.col(time_column))
+
+    invalid_count = (
+        bronze_stop_times
+        .filter(
+            F.col(time_column).isNotNull()
+            & (raw_time != "")
+            & ~raw_time.rlike(r"^\d{1,3}:[0-5]\d:[0-5]\d$")
+        )
+        .count()
+    )
+
+    print(f"Invalid {time_column} values: {invalid_count:,}")
+
+    if invalid_count > 0:
+        raise ValueError(
+            f"Invalid GTFS times in {time_column}: {invalid_count:,}"
+        )
 
 def time_to_seconds(column_name):
     parts = F.split(F.col(column_name), ":")
@@ -162,26 +215,19 @@ silver_stop_times = (
         & F.col("stop_id").isNotNull()
         & (F.col("stop_id") != "")
         & F.col("stop_sequence").isNotNull()
-        & F.col("arrival_seconds").isNotNull()
-        & F.col("departure_seconds").isNotNull()
     )
     .dropDuplicates(["snapshot_id", "trip_id", "stop_sequence"])
 )
 
-(
-    silver_stop_times.write
-    .format("delta")
-    .mode("overwrite")
-    .saveAsTable("workspace.default.silver_stop_times")
-)
+save_snapshot(silver_stop_times, "stop_times")
 
 print(
     "Silver stop times:",
-    spark.table("workspace.default.silver_stop_times").count()
+    spark.table(target("stop_times")).count()
 )
 
 display(
-    spark.table("workspace.default.silver_stop_times").limit(5)
+    spark.table(target("stop_times")).limit(5)
 )
 
 # COMMAND ----------
@@ -189,9 +235,7 @@ display(
 # DBTITLE 1,05 - Silver Calendar Dates Transformation
 from pyspark.sql import functions as F
 
-bronze_calendar = spark.table(
-    "workspace.default.bronze_calendar_dates"
-)
+bronze_calendar = bronze("calendar_dates")
 
 silver_calendar = (
     bronze_calendar
@@ -211,18 +255,13 @@ silver_calendar = (
     .dropDuplicates(["service_id", "service_date", "snapshot_id"])
 )
 
-(
-    silver_calendar.write
-    .format("delta")
-    .mode("overwrite")
-    .saveAsTable("workspace.default.silver_calendar_dates")
-)
+save_snapshot(silver_calendar, "calendar_dates")
 
 print(f"Bronze calendar dates: {bronze_calendar.count()}")
 print(f"Silver calendar dates: {silver_calendar.count()}")
 
 display(
-    spark.table("workspace.default.silver_calendar_dates").limit(5)
+    spark.table(target("calendar_dates")).limit(5)
 )
 
 # COMMAND ----------
@@ -230,10 +269,10 @@ display(
 # DBTITLE 1,06 - Silver Referential Integrity Validation
 from pyspark.sql import functions as F
 
-routes = spark.table("workspace.default.silver_routes")
-stops = spark.table("workspace.default.silver_stops")
-trips = spark.table("workspace.default.silver_trips")
-stop_times = spark.table("workspace.default.silver_stop_times")
+routes = spark.table(target("routes"))
+stops = spark.table(target("stops"))
+trips = spark.table(target("trips"))
+stop_times = spark.table(target("stop_times"))
 
 checks = [
     (
@@ -268,3 +307,56 @@ for name, child, parent, keys in checks:
 
     status = "PASS" if missing == 0 else "FAIL"
     print(f"{status}: {name} = {missing:,}")
+
+    if missing > 0:
+        raise ValueError(f"Referential integrity failed: {name} = {missing:,}")
+
+# COMMAND ----------
+
+# DBTITLE 1,07 - Bronze vs Silver Route Count Audit
+
+datasets = [
+    "routes",
+    "stops",
+    "trips",
+    "stop_times",
+    "calendar_dates",
+]
+
+audit_results = []
+
+for dataset in datasets:
+    bronze_count = spark.table(
+        f"{CATALOG_SCHEMA}.bronze_{dataset}"
+    ).filter(F.col("snapshot_id") == SNAPSHOT_ID).count()
+
+    silver_count = spark.table(
+        target(dataset)
+    ).filter(F.col("snapshot_id") == SNAPSHOT_ID).count()
+
+    removed_count = bronze_count - silver_count
+
+    audit_results.append((
+        dataset,
+        bronze_count,
+        silver_count,
+        removed_count
+    ))
+
+    print(
+        f"{dataset}: Bronze={bronze_count:,}, "
+        f"Silver={silver_count:,}, "
+        f"Difference={removed_count:,}"
+    )
+
+    if removed_count < 0:
+        raise ValueError(
+            f"Silver contains more rows than Bronze: {dataset}"
+        )
+
+audit_df = spark.createDataFrame(
+    audit_results,
+    ["dataset", "bronze_rows", "silver_rows", "removed_rows"]
+)
+
+display(audit_df)

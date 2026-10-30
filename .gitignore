@@ -1,26 +1,23 @@
 # Python
 .venv/
-venv/
 __pycache__/
-*.py[cod]
+*.pyc
 .pytest_cache/
 
-# Data files
-data/raw/
-data/processed/
-
-# Environment and credentials
+# Environment variables and secrets
 .env
 .env.*
 !.env.example
 
-# Logs
-*.log
+# Local GTFS data
+data/raw/
+data/processed/
+*.zip
 
-# Editor
+# IDE files
 .vscode/
 .idea/
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
