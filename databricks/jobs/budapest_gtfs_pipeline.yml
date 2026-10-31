@@ -36,13 +36,13 @@ resources:
           depends_on:
             - task_key: silver_transformations
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/03_gold_gtfs_analytics_SHARED
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/03_gold_gtfs_analytics
             source: WORKSPACE
         - task_key: snapshot_comparison
           depends_on:
             - task_key: gold_analytics
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/04_gold_snapshot_comparison_PRODUCTION
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/04_gold_snapshot_comparison
             source: WORKSPACE
       queue:
         enabled: true
