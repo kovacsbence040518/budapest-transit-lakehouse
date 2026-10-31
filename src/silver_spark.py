@@ -37,6 +37,31 @@ def transform_routes(bronze_df):
     )
 
 
+
+def transform_stops(bronze_df):
+    """Normalize stops, matching the existing Silver notebook's schema and filters."""
+    return (
+        bronze_df.select(
+            F.trim(F.col("stop_id")).alias("stop_id"),
+            F.trim(F.col("stop_name")).alias("stop_name"),
+            F.col("stop_lat").cast("double").alias("stop_lat"),
+            F.col("stop_lon").cast("double").alias("stop_lon"),
+            F.col("location_type").cast("int").alias("location_type"),
+            F.trim(F.col("parent_station")).alias("parent_station"),
+            F.col("wheelchair_boarding").cast("int").alias("wheelchair_boarding"),
+            F.col("snapshot_id"),
+            F.col("ingested_at"),
+        )
+        .filter(
+            F.col("stop_id").isNotNull()
+            & (F.col("stop_id") != "")
+            & F.col("stop_name").isNotNull()
+            & F.col("stop_lat").between(-90, 90)
+            & F.col("stop_lon").between(-180, 180)
+        )
+        .dropDuplicates(["stop_id", "snapshot_id"])
+    )
+
 def transform_trips(bronze_df):
     return (
         bronze_df.select(
@@ -88,6 +113,29 @@ def transform_stop_times(bronze_df):
         .dropDuplicates(["snapshot_id", "trip_id", "stop_sequence"])
     )
 
+
+
+def transform_calendar_dates(bronze_df):
+    """Convert calendar exceptions while retaining snapshot-specific keys."""
+    return (
+        bronze_df.select(
+            F.trim(F.col("service_id")).alias("service_id"),
+            F.try_to_timestamp(
+                F.col("date"),
+                F.lit("yyyyMMdd")
+            ).cast("date").alias("service_date"),
+            F.col("exception_type").cast("int").alias("exception_type"),
+            F.col("snapshot_id"),
+            F.col("ingested_at"),
+        )
+        .filter(
+            F.col("service_id").isNotNull()
+            & (F.col("service_id") != "")
+            & F.col("service_date").isNotNull()
+            & F.col("exception_type").isin(1, 2)
+        )
+        .dropDuplicates(["service_id", "service_date", "snapshot_id"])
+    )
 
 def assert_references(child_df, parent_df, keys, description):
     missing = child_df.join(parent_df.select(*keys).dropDuplicates(), keys, "left_anti")
