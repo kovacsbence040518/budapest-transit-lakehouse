@@ -1,0 +1,6 @@
+
+# Data processing
+pyspark==4.2.1
+
+# Automated testing
+pytest==9.2.0
