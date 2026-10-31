@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   pytest:
-    name: Run 31 automated tests
+    name: Run automated tests
     runs-on: ubuntu-latest
 
     steps:

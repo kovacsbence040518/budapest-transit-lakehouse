@@ -14,7 +14,6 @@
         "    SELECT MAX(snapshot_id)\r\n",
         "    FROM workspace.default.gold_daily_service\r\n",
         ")\r\n",
-        "AND departure_date BETWEEN '2026-10-28' AND '2026-12-01'\r\n",
         "ORDER BY departure_date;"
       ]
     },
