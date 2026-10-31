@@ -5,11 +5,11 @@
 # ///
 # DBTITLE 1,00 - Configuration and Shared Module
 import sys
-from pathlib import Path
+import os
 from pyspark.sql import functions as F
 
-# snapshot_comparison.py must be available as a Python workspace file in Drafts.
-MODULE_DIR = str(Path('/Workspace/Users/kovacsbence040518@gmail.com/Drafts'))
+# Import shared module from the current notebook directory (same pattern as Silver).
+MODULE_DIR = os.getcwd()
 if MODULE_DIR not in sys.path:
     sys.path.insert(0, MODULE_DIR)
 from snapshot_comparison import compare_snapshot_pair

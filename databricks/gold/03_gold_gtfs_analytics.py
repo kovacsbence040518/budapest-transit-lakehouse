@@ -5,11 +5,11 @@
 # ///
 # DBTITLE 1,00 - Shared Gold Production Configuration
 import sys
-from pathlib import Path
+import os
 from pyspark.sql import functions as F
 
-# gold_spark.py must be a Python workspace FILE in the same folder as this notebook.
-WORKSPACE_DIR = str(Path('/Workspace/Users/kovacsbence040518@gmail.com/Drafts'))
+# Import shared module from the current notebook directory (same pattern as Silver).
+WORKSPACE_DIR = os.getcwd()
 if WORKSPACE_DIR not in sys.path:
     sys.path.insert(0, WORKSPACE_DIR)
 from gold_spark import (
