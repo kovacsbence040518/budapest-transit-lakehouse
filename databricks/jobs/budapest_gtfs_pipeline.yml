@@ -1,0 +1,53 @@
+resources:
+  jobs:
+    Budapest_GTFS_Lakehouse_Pipeline:
+      name: Budapest GTFS Lakehouse Pipeline
+      schedule:
+        quartz_cron_expression: 26 0 6 * * ?
+        timezone_id: Europe/Budapest
+        pause_status: UNPAUSED
+      tasks:
+        - task_key: download_gtfs
+          notebook_task:
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/testing/00_download_gtfs_databricks
+            source: WORKSPACE
+        - task_key: check_feed_changed
+          depends_on:
+            - task_key: download_gtfs
+          condition_task:
+            op: EQUAL_TO
+            left: "{{tasks.download_gtfs.values.feed_changed}}"
+            right: "true"
+        - task_key: bronze_ingestion
+          depends_on:
+            - task_key: check_feed_changed
+              outcome: "true"
+          notebook_task:
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/01_bronze_gtfs_ingestion
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: silver_transformations
+          depends_on:
+            - task_key: bronze_ingestion
+          notebook_task:
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/02_silver_gtfs_transformations_SHARED
+            source: WORKSPACE
+        - task_key: gold_analytics
+          depends_on:
+            - task_key: silver_transformations
+          notebook_task:
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/03_gold_gtfs_analytics_SHARED
+            source: WORKSPACE
+        - task_key: snapshot_comparison
+          depends_on:
+            - task_key: gold_analytics
+          notebook_task:
+            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/04_gold_snapshot_comparison_PRODUCTION
+            source: WORKSPACE
+      queue:
+        enabled: true
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "6"
+      performance_target: PERFORMANCE_OPTIMIZED

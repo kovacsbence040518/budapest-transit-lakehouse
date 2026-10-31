@@ -1,0 +1,1065 @@
+{
+  "datasets": [
+    {
+      "name": "880fc5ec",
+      "displayName": "Daily Transport Service Overview Dataset",
+      "queryLines": [
+        "SELECT\r\n",
+        "    departure_date,\r\n",
+        "    total_scheduled_departures,\r\n",
+        "    active_routes,\r\n",
+        "    transport_types\r\n",
+        "FROM workspace.default.gold_daily_service\r\n",
+        "WHERE snapshot_id = (\r\n",
+        "    SELECT MAX(snapshot_id)\r\n",
+        "    FROM workspace.default.gold_daily_service\r\n",
+        ")\r\n",
+        "AND departure_date BETWEEN '2026-10-28' AND '2026-12-01'\r\n",
+        "ORDER BY departure_date;"
+      ]
+    },
+    {
+      "name": "3dfcfee5",
+      "displayName": "Top 10 Busiest Routes",
+      "queryLines": [
+        "SELECT\r\n",
+        "    route_short_name,\r\n",
+        "    route_type,\r\n",
+        "    total_trips,\r\n",
+        "    unique_stops\r\n",
+        "FROM workspace.default.gold_route_statistics\r\n",
+        "WHERE snapshot_id = (\r\n",
+        "    SELECT MAX(snapshot_id)\r\n",
+        "    FROM workspace.default.gold_route_statistics\r\n",
+        ")\r\n",
+        "AND total_trips > 0\r\n",
+        "ORDER BY total_trips DESC\r\n",
+        "LIMIT 10;"
+      ]
+    },
+    {
+      "name": "815396db",
+      "displayName": "Top 10 Busiest Stop",
+      "queryLines": [
+        "SELECT\r\n",
+        "    CONCAT(\r\n",
+        "        LEFT(stop_name, 22),\r\n",
+        "        CASE WHEN LENGTH(stop_name) > 22 THEN '…' ELSE '' END,\r\n",
+        "        ' (', stop_id, ')'\r\n",
+        "    ) AS stop_label,\r\n",
+        "    total_stop_events,\r\n",
+        "    unique_routes\r\n",
+        "FROM workspace.default.gold_stop_activity\r\n",
+        "WHERE snapshot_id = (\r\n",
+        "    SELECT MAX(snapshot_id)\r\n",
+        "    FROM workspace.default.gold_stop_activity\r\n",
+        ")\r\n",
+        "AND total_stop_events > 0\r\n",
+        "ORDER BY total_stop_events DESC\r\n",
+        "LIMIT 10;"
+      ]
+    },
+    {
+      "name": "9a48ce59",
+      "displayName": "Network Overview KPIs",
+      "queryLines": [
+        "SELECT\r\n",
+        "    (\r\n",
+        "        SELECT COUNT(*)\r\n",
+        "        FROM workspace.default.gold_route_statistics\r\n",
+        "        WHERE snapshot_id = (\r\n",
+        "            SELECT MAX(snapshot_id)\r\n",
+        "            FROM workspace.default.gold_route_statistics\r\n",
+        "        )\r\n",
+        "    ) AS total_routes,\r\n",
+        "\r\n",
+        "    (\r\n",
+        "        SELECT COUNT(*)\r\n",
+        "        FROM workspace.default.gold_stop_activity\r\n",
+        "        WHERE snapshot_id = (\r\n",
+        "            SELECT MAX(snapshot_id)\r\n",
+        "            FROM workspace.default.gold_stop_activity\r\n",
+        "        )\r\n",
+        "    ) AS total_stops,\r\n",
+        "\r\n",
+        "    (\r\n",
+        "        SELECT COUNT(*)\r\n",
+        "        FROM workspace.default.silver_trips\r\n",
+        "        WHERE snapshot_id = (\r\n",
+        "            SELECT MAX(snapshot_id)\r\n",
+        "            FROM workspace.default.silver_trips\r\n",
+        "        )\r\n",
+        "    ) AS total_trip_records;"
+      ]
+    },
+    {
+      "name": "9494f8b8",
+      "displayName": "Latest Snapshot Changes",
+      "queryLines": [
+        "-- Dataset: Latest Snapshot Changes\r\n",
+        "SELECT\r\n",
+        "  previous_snapshot_id,\r\n",
+        "  current_snapshot_id,\r\n",
+        "  previous_routes,\r\n",
+        "  current_routes,\r\n",
+        "  routes_added,\r\n",
+        "  routes_removed,\r\n",
+        "  current_routes - previous_routes AS net_route_change,\r\n",
+        "  previous_stops,\r\n",
+        "  current_stops,\r\n",
+        "  stops_added,\r\n",
+        "  stops_removed,\r\n",
+        "  current_stops - previous_stops AS net_stop_change,\r\n",
+        "  previous_trips,\r\n",
+        "  current_trips,\r\n",
+        "  trips_added,\r\n",
+        "  trips_removed,\r\n",
+        "  current_trips - previous_trips AS net_trip_change,\r\n",
+        "  shared_departure_dates,\r\n",
+        "  previous_shared_date_departures,\r\n",
+        "  current_shared_date_departures,\r\n",
+        "  shared_date_departures_change\r\n",
+        "FROM workspace.default.gold_snapshot_changes\r\n",
+        "ORDER BY current_snapshot_id DESC\r\n",
+        "LIMIT 1;\r\n"
+      ]
+    },
+    {
+      "name": "442e14e2",
+      "displayName": "Added Removed by Type",
+      "queryLines": [
+        "-- Dataset: Added and Removed by Type (latest snapshot pair)\r\n",
+        "WITH latest AS (\r\n",
+        "  SELECT * FROM workspace.default.gold_snapshot_changes\r\n",
+        "  ORDER BY current_snapshot_id DESC\r\n",
+        "  LIMIT 1\r\n",
+        ")\r\n",
+        "SELECT 'Routes' AS entity_type, routes_added AS added, routes_removed AS removed FROM latest\r\n",
+        "UNION ALL\r\n",
+        "SELECT 'Stops', stops_added, stops_removed FROM latest\r\n",
+        "UNION ALL\r\n",
+        "SELECT 'Trips', trips_added, trips_removed FROM latest;\r\n"
+      ]
+    },
+    {
+      "name": "bba762a4",
+      "displayName": "Snapshot Change History",
+      "queryLines": [
+        "-- Dataset: Snapshot Change History\r\n",
+        "-- Snapshot ID is a feed download identifier, not a service date.\r\n",
+        "SELECT\r\n",
+        "  current_snapshot_id,\r\n",
+        "  previous_snapshot_id,\r\n",
+        "  current_routes - previous_routes AS net_route_change,\r\n",
+        "  current_stops - previous_stops AS net_stop_change,\r\n",
+        "  current_trips - previous_trips AS net_trip_change,\r\n",
+        "  routes_added, routes_removed,\r\n",
+        "  stops_added, stops_removed,\r\n",
+        "  trips_added, trips_removed,\r\n",
+        "  shared_departure_dates,\r\n",
+        "  shared_date_departures_change\r\n",
+        "FROM workspace.default.gold_snapshot_changes\r\n",
+        "ORDER BY current_snapshot_id ASC;\r\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "79d67ea6",
+      "displayName": "Transport Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "daily-scheduled-departures",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "880fc5ec",
+                  "fields": [
+                    {
+                      "name": "daily(departure_date)",
+                      "expression": "DATE_TRUNC(\"DAY\", `departure_date`)"
+                    },
+                    {
+                      "name": "sum(total_scheduled_departures)",
+                      "expression": "SUM(`total_scheduled_departures`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 18px;font-weight: 700;\">Daily Scheduled Departures</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(departure_date)",
+                  "displayName": "Date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_scheduled_departures)",
+                  "displayName": "Scheduled Departures",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "top-10-routes-scheduled-trips",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "3dfcfee5",
+                  "fields": [
+                    {
+                      "name": "route_short_name",
+                      "expression": "`route_short_name`"
+                    },
+                    {
+                      "name": "sum(total_trips)",
+                      "expression": "SUM(`total_trips`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 18px;font-weight: 700;\">Top 10 Routes by Scheduled Trips</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "route_short_name",
+                  "displayName": "Routes",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_trips)",
+                  "displayName": "Scheduled Trips",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "top-10-stops-scheduled-events",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "815396db",
+                  "fields": [
+                    {
+                      "name": "sum(total_stop_events)",
+                      "expression": "SUM(`total_stop_events`)"
+                    },
+                    {
+                      "name": "stop_label",
+                      "expression": "`stop_label`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 18px;font-weight: 700;\">Top 10 Stops by Scheduled Events</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(total_stop_events)",
+                  "displayName": "Scheduled Stop Events",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "stop_label",
+                  "displayName": "Stop",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "total-routes",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9a48ce59",
+                  "fields": [
+                    {
+                      "name": "sum(total_routes)",
+                      "expression": "SUM(`total_routes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 14px;font-weight: 700;\">Total Routes</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_routes)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  },
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "total-stops",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9a48ce59",
+                  "fields": [
+                    {
+                      "name": "sum(total_stops)",
+                      "expression": "SUM(`total_stops`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-weight: 700;font-size: 14px;\">Total Stops</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_stops)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  },
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "scheduled-trip-records",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9a48ce59",
+                  "fields": [
+                    {
+                      "name": "sum(total_trip_records)",
+                      "expression": "SUM(`total_trip_records`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 14px;font-weight: 700;\">Scheduled Trip Records</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_trip_records)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  },
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "197c81df",
+      "displayName": "Network Changes",
+      "layout": [
+        {
+          "widget": {
+            "name": "net-route-change",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9494f8b8",
+                  "fields": [
+                    {
+                      "name": "sum(net_route_change)",
+                      "expression": "SUM(`net_route_change`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 14px;font-weight: 700;\">Net Route Change</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(net_route_change)",
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "net-stop-change",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9494f8b8",
+                  "fields": [
+                    {
+                      "name": "sum(net_stop_change)",
+                      "expression": "SUM(`net_stop_change`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 14px;font-weight: 700;\">Net Stop Change</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(net_stop_change)",
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "net-trip-change",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9494f8b8",
+                  "fields": [
+                    {
+                      "name": "sum(net_trip_change)",
+                      "expression": "SUM(`net_trip_change`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-weight: 700;font-size: 14px;\">Net Trip Change</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(net_trip_change)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  },
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "scheduled-departure-change",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "9494f8b8",
+                  "fields": [
+                    {
+                      "name": "sum(shared_date_departures_change)",
+                      "expression": "SUM(`shared_date_departures_change`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-weight: 700;font-size: 14px;\">Scheduled Departure Change</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(shared_date_departures_change)",
+                  "style": {
+                    "fontSize": 32
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "added-vs-removed-records",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "442e14e2",
+                  "fields": [
+                    {
+                      "name": "entity_type",
+                      "expression": "`entity_type`"
+                    },
+                    {
+                      "name": "sum(added)",
+                      "expression": "SUM(`added`)"
+                    },
+                    {
+                      "name": "sum(removed)",
+                      "expression": "SUM(`removed`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`entity_type` IN ('Stops', 'Routes')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-size: 18px;font-weight: 700;\">Route and Stop Changes</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "entity_type",
+                  "displayName": "Entity Type",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(added)"
+                    },
+                    {
+                      "fieldName": "sum(removed)"
+                    }
+                  ],
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "axis": {
+                    "title": "Records"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "snapshot-history",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "bba762a4",
+                  "fields": [
+                    {
+                      "name": "current_snapshot_id",
+                      "expression": "`current_snapshot_id`"
+                    },
+                    {
+                      "name": "previous_snapshot_id",
+                      "expression": "`previous_snapshot_id`"
+                    },
+                    {
+                      "name": "net_route_change",
+                      "expression": "`net_route_change`"
+                    },
+                    {
+                      "name": "net_stop_change",
+                      "expression": "`net_stop_change`"
+                    },
+                    {
+                      "name": "net_trip_change",
+                      "expression": "`net_trip_change`"
+                    },
+                    {
+                      "name": "shared_date_departures_change",
+                      "expression": "`shared_date_departures_change`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-weight: 700;font-size: 18px;\">Snapshot History</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "current_snapshot_id",
+                    "displayName": "Current",
+                    "style": {
+                      "type": "basic",
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "fieldName": "previous_snapshot_id",
+                    "displayName": "Previous",
+                    "style": {
+                      "type": "basic",
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "fieldName": "net_route_change",
+                    "contentAlignment": "left",
+                    "displayName": "Routes",
+                    "style": {
+                      "type": "basic",
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "fieldName": "net_stop_change",
+                    "contentAlignment": "left",
+                    "displayName": "Stops",
+                    "style": {
+                      "type": "basic",
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "fieldName": "net_trip_change",
+                    "contentAlignment": "left",
+                    "displayName": "Trips",
+                    "style": {
+                      "type": "basic",
+                      "fontSize": 16
+                    }
+                  },
+                  {
+                    "fieldName": "shared_date_departures_change",
+                    "contentAlignment": "left",
+                    "displayName": "Departures",
+                    "style": {
+                      "type": "basic",
+                      "fontSize": 16
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "a6de5c22",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "442e14e2",
+                  "fields": [
+                    {
+                      "name": "entity_type",
+                      "expression": "`entity_type`"
+                    },
+                    {
+                      "name": "sum(added)",
+                      "expression": "SUM(`added`)"
+                    },
+                    {
+                      "name": "sum(removed)",
+                      "expression": "SUM(`removed`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`entity_type` IN ('Trips')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"font-weight: 700;font-size: 18px;\">Trip Changes</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "entity_type",
+                  "displayName": "Entity Type",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "Routes",
+                        "Stops",
+                        "Trips"
+                      ]
+                    }
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(added)"
+                    },
+                    {
+                      "fieldName": "sum(removed)"
+                    }
+                  ],
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "axis": {
+                    "title": "Records"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "9dd47e3b",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"font-size:14px\">This dashboard compares consecutive BKK GTFS feed snapshots to identify changes in route, stop, and trip records, as well as scheduled departures.</span><br><span style=\"font-size:14px\">Note: Changes reflect differences in published timetable data, not actual passenger journeys. Scheduled departure changes are calculated only across service dates shared by both snapshots.</span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
