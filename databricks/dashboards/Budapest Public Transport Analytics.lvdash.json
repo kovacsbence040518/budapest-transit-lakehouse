@@ -202,6 +202,10 @@
               "encodings": {
                 "x": {
                   "fieldName": "daily(departure_date)",
+                  "format": {
+                    "type": "date",
+                    "date": "locale-short-month"
+                  },
                   "displayName": "Date",
                   "scale": {
                     "type": "temporal"
@@ -209,6 +213,14 @@
                 },
                 "y": {
                   "fieldName": "sum(total_scheduled_departures)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
                   "displayName": "Scheduled Departures",
                   "scale": {
                     "type": "quantitative"
@@ -714,6 +726,14 @@
                   "fieldName": "sum(shared_date_departures_change)",
                   "style": {
                     "fontSize": 32
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
                   }
                 }
               },
@@ -1009,16 +1029,16 @@
                       "fieldName": "sum(removed)"
                     }
                   ],
+                  "axis": {
+                    "title": "Records"
+                  },
                   "format": {
                     "type": "number-plain",
-                    "abbreviation": "compact",
+                    "abbreviation": "none",
                     "decimalPlaces": {
                       "type": "max",
                       "places": 2
                     }
-                  },
-                  "axis": {
-                    "title": "Records"
                   }
                 }
               },
