@@ -22,7 +22,7 @@ from silver_spark import (
 
 CATALOG_SCHEMA = "workspace.default"
 SOURCE_PREFIX = "bronze_"
-TARGET_PREFIX = "silver_"  # PRODUCTION tables: run only after validating test_shared_silver_ results.
+TARGET_PREFIX = "silver_"
 DATASETS = ["routes", "stops", "trips", "stop_times", "calendar_dates"]
 
 SNAPSHOT_ID = (

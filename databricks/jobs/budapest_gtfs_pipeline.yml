@@ -9,7 +9,7 @@ resources:
       tasks:
         - task_key: download_gtfs
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/testing/00_download_gtfs_databricks
+            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Drafts/testing/00_download_gtfs_databricks
             source: WORKSPACE
         - task_key: check_feed_changed
           depends_on:

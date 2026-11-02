@@ -154,7 +154,7 @@ The deployed project uses:
 - A scheduled Databricks Job whose definitions are exported as YAML.
 - A Databricks SQL dashboard whose definition is exported as `.lvdash.json`.
 
-The committed YAML is a **reference export of the running Job**, not a fully portable one-click deployment. Its absolute workspace notebook paths are specific to the original workspace. To reproduce the pipeline in another workspace, upload the required notebooks and shared modules, create or configure the Volume, update paths and schema references, and import/adapt the Job and dashboard definitions. Keep authentication and workspace-specific configuration out of source control.
+The committed YAML is a **reference export of the running Job**, not a fully portable one-click deployment. Its notebook paths contain a `YOUR_DATABRICKS_USER` placeholder and retain the original workspace folder layout. Replace the placeholder and adjust the paths to match your own workspace. To reproduce the pipeline in another workspace, upload the required notebooks and shared modules, create or configure the Volume, update paths and schema references, and import/adapt the Job and dashboard definitions. Keep authentication and workspace-specific configuration out of source control. The running Job in the original workspace is unchanged by edits to this reference YAML.
 
 ## Limitations
 
@@ -164,6 +164,23 @@ The committed YAML is a **reference export of the running Job**, not a fully por
 - Table-level Delta writes are snapshot-scoped but are **not atomic across multiple output tables**.
 - The exported dashboard definition references tables in the original Databricks catalog and requires adaptation in another workspace.
 - Continuous integration checks the shared Python/PySpark logic; it does not deploy the Databricks Job or run a full cloud integration test on each push.
+
+## Problems encountered and solutions
+
+- **Different implementations in notebooks and tests:** Early notebook versions contained transformation logic separate from the Python modules exercised by pytest. Silver, Gold, and snapshot comparison now import the shared modules, so tests and production use the same transformation functions.
+- **Extra rows and stale results during reruns:** Snapshot-aware `replaceWhere` writes replace only the current snapshot’s rows, while row-count reconciliation checks what actually persisted. Individual table commits remain separate transactions.
+- **Repeated downloads of an unchanged feed:** The downloader hashes the incoming ZIP and compares it to earlier snapshots. The Job’s conditional task skips downstream ingestion when the feed has not changed.
+- **Misleading snapshot growth comparisons:** Different GTFS releases can cover different timetable periods. Scheduled departures are therefore compared only across service dates shared by both snapshots, rather than treating a longer date window as growth.
+
+## Potential future improvements
+
+- Move raw feed archives to a general-purpose cloud object store and automate environment provisioning.
+- Monitor snapshot freshness and notify on ingestion failures or stale source feeds.
+- Add a repeatable deployment workflow for the Job, workspace files, and dashboard rather than relying on reference exports.
+
+## License
+
+Released under the [MIT License](LICENSE).
 
 ## Data source
 
