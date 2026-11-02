@@ -14,6 +14,14 @@
         "    SELECT MAX(snapshot_id)\r\n",
         "    FROM workspace.default.gold_daily_service\r\n",
         ")\r\n",
+        "AND departure_date < (\r\n",
+        "    SELECT MAX(departure_date)\r\n",
+        "    FROM workspace.default.gold_daily_service\r\n",
+        "    WHERE snapshot_id = (\r\n",
+        "        SELECT MAX(snapshot_id)\r\n",
+        "        FROM workspace.default.gold_daily_service\r\n",
+        "    )\r\n",
+        ")\r\n",
         "ORDER BY departure_date;"
       ]
     },
