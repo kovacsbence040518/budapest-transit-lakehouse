@@ -9,7 +9,8 @@ resources:
       tasks:
         - task_key: download_gtfs
           notebook_task:
-            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Drafts/testing/00_download_gtfs_databricks
+            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Budapest Transit
+              Lakehouse/00_download_gtfs_databricks
             source: WORKSPACE
         - task_key: check_feed_changed
           depends_on:
@@ -23,26 +24,30 @@ resources:
             - task_key: check_feed_changed
               outcome: "true"
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/01_bronze_gtfs_ingestion
+            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Budapest Transit
+              Lakehouse/01_bronze_gtfs_ingestion
             source: WORKSPACE
           environment_key: Default
         - task_key: silver_transformations
           depends_on:
             - task_key: bronze_ingestion
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/02_silver_gtfs_transformations_SHARED
+            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Budapest Transit
+              Lakehouse/02_silver_gtfs_transformations
             source: WORKSPACE
         - task_key: gold_analytics
           depends_on:
             - task_key: silver_transformations
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/03_gold_gtfs_analytics
+            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Budapest Transit
+              Lakehouse/03_gold_gtfs_analytics
             source: WORKSPACE
         - task_key: snapshot_comparison
           depends_on:
             - task_key: gold_analytics
           notebook_task:
-            notebook_path: /Workspace/Users/kovacsbence040518@gmail.com/Drafts/04_gold_snapshot_comparison
+            notebook_path: /Workspace/Users/YOUR_DATABRICKS_USER/Budapest Transit
+              Lakehouse/04_gold_snapshot_comparison
             source: WORKSPACE
       queue:
         enabled: true
